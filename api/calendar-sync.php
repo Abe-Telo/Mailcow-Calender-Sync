@@ -4,7 +4,6 @@ declare(strict_types=1);
 session_start();
 header('Content-Type: application/json');
 
-// Require logged in Mailcow user session.
 if (!isset($_SESSION['mailcow_user']) || empty($_SESSION['mailcow_user'])) {
   http_response_code(401);
   echo json_encode(['error' => 'Authentication required']);
@@ -17,26 +16,43 @@ $pdo = new PDO(getenv('MC_DB_DSN'), getenv('MC_DB_USER'), getenv('MC_DB_PASS'), 
 ]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-  $stmt = $pdo->prepare('SELECT id, name, email_a, email_b, provider_a, provider_b, status FROM calendar_sync_links WHERE owner = :owner ORDER BY created_at DESC');
+  $stmt = $pdo->prepare('SELECT id, name, email_a, email_b, provider_a, provider_b, sync_direction, status FROM calendar_sync_links WHERE owner = :owner ORDER BY created_at DESC');
   $stmt->execute(['owner' => $_SESSION['mailcow_user']]);
   echo json_encode(['items' => $stmt->fetchAll()]);
   exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+  try {
+    $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+  } catch (JsonException $e) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body']);
+    exit;
+  }
+
+  if (!is_array($input)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body']);
+    exit;
+  }
 
   $allowedProviders = ['mailcow', 'google', 'outlook'];
+  $allowedDirections = ['two_way', 'a_to_b', 'b_to_a'];
   if (!in_array($input['provider_a'] ?? '', $allowedProviders, true) || !in_array($input['provider_b'] ?? '', $allowedProviders, true)) {
     http_response_code(422);
     echo json_encode(['error' => 'Unsupported provider']);
     exit;
   }
+  if (!in_array($input['sync_direction'] ?? '', $allowedDirections, true)) {
+    http_response_code(422);
+    echo json_encode(['error' => 'Unsupported sync direction']);
+    exit;
+  }
 
-  // Never store password in plaintext. Replace with vault/KMS integration in production.
   $hashedSecret = password_hash((string)$input['mailcow_secret'], PASSWORD_ARGON2ID);
 
-  $stmt = $pdo->prepare('INSERT INTO calendar_sync_links (owner, name, email_a, email_b, provider_a, provider_b, secret_hash, status) VALUES (:owner, :name, :email_a, :email_b, :provider_a, :provider_b, :secret_hash, :status)');
+  $stmt = $pdo->prepare('INSERT INTO calendar_sync_links (owner, name, email_a, email_b, provider_a, provider_b, sync_direction, secret_hash, status) VALUES (:owner, :name, :email_a, :email_b, :provider_a, :provider_b, :sync_direction, :secret_hash, :status)');
   $stmt->execute([
     'owner' => $_SESSION['mailcow_user'],
     'name' => mb_substr((string)$input['name'], 0, 120),
@@ -44,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     'email_b' => (string)$input['email_b'],
     'provider_a' => (string)$input['provider_a'],
     'provider_b' => (string)$input['provider_b'],
+    'sync_direction' => (string)$input['sync_direction'],
     'secret_hash' => $hashedSecret,
     'status' => 'pending_auth',
   ]);

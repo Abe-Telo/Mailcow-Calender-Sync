@@ -10,6 +10,9 @@
     label { display: block; margin-top: .5rem; }
     input, select, button { width: 100%; padding: .5rem; margin-top: .25rem; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .inline { display: flex; gap: 0.5rem; align-items: center; }
+    .inline input { width: auto; }
+    .provider-auth { margin-top: .5rem; display: none; }
   </style>
 </head>
 <body>
@@ -32,6 +35,9 @@
             <option value="google">Google Calendar</option>
             <option value="outlook">Outlook Calendar</option>
           </select>
+          <div id="googleAuthA" class="provider-auth">
+            <button type="button" onclick="connectGoogle('A')">Connect Google (A)</button>
+          </div>
         </div>
         <div>
           <label>Calendar B email</label>
@@ -42,8 +48,18 @@
             <option value="google">Google Calendar</option>
             <option value="outlook">Outlook Calendar</option>
           </select>
+          <div id="googleAuthB" class="provider-auth">
+            <button type="button" onclick="connectGoogle('B')">Connect Google (B)</button>
+          </div>
         </div>
       </div>
+
+      <label>Sync direction</label>
+      <select id="syncDirection" required>
+        <option value="two_way">Two-way sync (A ↔ B)</option>
+        <option value="a_to_b">One-way sync (A → B)</option>
+        <option value="b_to_a">One-way sync (B → A)</option>
+      </select>
 
       <label>Mailcow password (or app password)</label>
       <input id="mailcowSecret" type="password" autocomplete="new-password" required />
@@ -55,12 +71,28 @@
   <div class="card">
     <h2>Existing syncs</h2>
     <table id="syncTable" width="100%">
-      <thead><tr><th>Name</th><th>A</th><th>B</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>A</th><th>B</th><th>Direction</th><th>Status</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
 
   <script>
+    const providerA = document.getElementById('providerA');
+    const providerB = document.getElementById('providerB');
+
+    function updateProviderAuthVisibility() {
+      document.getElementById('googleAuthA').style.display = providerA.value === 'google' ? 'block' : 'none';
+      document.getElementById('googleAuthB').style.display = providerB.value === 'google' ? 'block' : 'none';
+    }
+
+    function connectGoogle(side) {
+      const popup = window.open('/api/oauth/google/start.php?side=' + encodeURIComponent(side), 'googleOAuth', 'width=520,height=700');
+      if (!popup) alert('Please allow popups to connect Google Calendar.');
+    }
+
+    providerA.addEventListener('change', updateProviderAuthVisibility);
+    providerB.addEventListener('change', updateProviderAuthVisibility);
+
     async function loadSyncs() {
       const r = await fetch('/api/calendar-sync.php', { credentials: 'include' });
       if (!r.ok) return;
@@ -69,7 +101,7 @@
       tbody.innerHTML = '';
       for (const s of data.items || []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td><td>${s.email_a}</td><td>${s.email_b}</td><td>${s.status}</td>`;
+        tr.innerHTML = `<td>${s.name}</td><td>${s.email_a} (${s.provider_a})</td><td>${s.email_b} (${s.provider_b})</td><td>${s.sync_direction}</td><td>${s.status}</td>`;
         tbody.appendChild(tr);
       }
     }
@@ -80,8 +112,9 @@
         name: document.getElementById('name').value.trim(),
         email_a: document.getElementById('emailA').value.trim(),
         email_b: document.getElementById('emailB').value.trim(),
-        provider_a: document.getElementById('providerA').value,
-        provider_b: document.getElementById('providerB').value,
+        provider_a: providerA.value,
+        provider_b: providerB.value,
+        sync_direction: document.getElementById('syncDirection').value,
         mailcow_secret: document.getElementById('mailcowSecret').value
       };
       const r = await fetch('/api/calendar-sync.php', {
@@ -92,12 +125,14 @@
       });
       if (r.ok) {
         document.getElementById('syncForm').reset();
+        updateProviderAuthVisibility();
         await loadSyncs();
       } else {
         alert('Unable to create sync. Check login and inputs.');
       }
     });
 
+    updateProviderAuthVisibility();
     loadSyncs();
   </script>
 </body>

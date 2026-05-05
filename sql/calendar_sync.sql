@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS calendar_sync_links (
   email_b VARCHAR(255) NOT NULL,
   provider_a ENUM('mailcow','google','outlook') NOT NULL,
   provider_b ENUM('mailcow','google','outlook') NOT NULL,
+  sync_direction ENUM('two_way','a_to_b','b_to_a') NOT NULL DEFAULT 'two_way',
   secret_hash VARCHAR(255) NOT NULL,
   status ENUM('pending_auth','active','failed','paused') NOT NULL DEFAULT 'pending_auth',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
