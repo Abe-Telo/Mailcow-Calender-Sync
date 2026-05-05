@@ -23,7 +23,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+  try {
+    $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+  } catch (JsonException $e) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body']);
+    exit;
+  }
+
+  if (!is_array($input)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body']);
+    exit;
+  }
 
   $allowedProviders = ['mailcow', 'google', 'outlook'];
   $allowedDirections = ['two_way', 'a_to_b', 'b_to_a'];
