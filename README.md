@@ -6,6 +6,7 @@ This repository includes a secure starter implementation for a Mailcow UI module
 - Mailcow ↔ Google Calendar
 - Mailcow ↔ Outlook Calendar
 
+
 It now supports sync direction modes:
 - Two-way sync (A ↔ B)
 - One-way sync (A → B)
