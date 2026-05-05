@@ -4,7 +4,6 @@ declare(strict_types=1);
 session_start();
 header('Content-Type: application/json');
 
-
 function jsonResponse(int $statusCode, array $payload): void {
   http_response_code($statusCode);
   header('Content-Type: application/json');
@@ -16,18 +15,31 @@ function denyCsrf(): void {
   jsonResponse(403, ['error' => 'CSRF validation failed']);
 }
 
-function internalErrorResponse(string $logMessage, Throwable $exception, int $statusCode = 500): void {
-  error_log(sprintf('%s: %s in %s:%d', $logMessage, $exception->getMessage(), $exception->getFile(), $exception->getLine()));
+function internalErrorResponse(string $message, Throwable $exception, int $statusCode = 500): void {
+  error_log(sprintf('%s: %s in %s:%d', $message, $exception->getMessage(), $exception->getFile(), $exception->getLine()));
   jsonResponse($statusCode, ['error' => 'Internal server error']);
+}
+
+function audit(PDO $pdo, string $owner, string $action, string $targetType, ?int $targetId, string $result, array $metadata = []): void {
+  $stmt = $pdo->prepare('INSERT INTO calendar_sync_audit_log (owner_mailbox, actor, action, target_type, target_id, result, metadata_json) VALUES (:owner,:actor,:action,:target_type,:target_id,:result,:metadata_json)');
+  $stmt->execute([
+    'owner' => $owner,
+    'actor' => $owner,
+    'action' => $action,
+    'target_type' => $targetType,
+    'target_id' => $targetId,
+    'result' => $result,
+    'metadata_json' => json_encode($metadata),
+  ]);
 }
 
 if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
   $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-
 if (!isset($_SESSION['mailcow_user']) || empty($_SESSION['mailcow_user'])) {
   jsonResponse(401, ['error' => 'Authentication required']);
 }
+$owner = (string)$_SESSION['mailcow_user'];
 
 $dbDsn = getenv('MC_DB_DSN');
 $dbUser = getenv('MC_DB_USER');
@@ -44,107 +56,86 @@ try {
   ]);
 } catch (PDOException $e) {
   internalErrorResponse('Database connection failed', $e, 503);
-} catch (Throwable $e) {
-  internalErrorResponse('Unexpected error during database initialization', $e, 500);
 }
 
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$path = $_GET['path'] ?? 'jobs';
+
 try {
-  if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $stmt = $pdo->prepare('SELECT id, name, email_a, email_b, provider_a, provider_b, sync_direction, status FROM calendar_sync_links WHERE owner = :owner ORDER BY created_at DESC');
-    $stmt->execute(['owner' => $_SESSION['mailcow_user']]);
+  if ($method === 'GET' && $path === 'jobs') {
+    $stmt = $pdo->prepare('SELECT j.id, j.mailcow_calendar_id, j.external_calendar_id, j.direction, j.conflict_policy, j.interval_seconds, j.enabled, j.status, j.last_run_at, j.last_success_at, j.last_error_code, j.last_error_message, a.provider FROM calendar_sync_jobs j JOIN calendar_sync_accounts a ON a.id = j.external_account_id WHERE j.owner_mailbox = :owner ORDER BY j.created_at DESC');
+    $stmt->execute(['owner' => $owner]);
+    jsonResponse(200, ['items' => $stmt->fetchAll(), 'csrf_token' => $_SESSION['csrf_token']]);
+  }
+  if ($method === 'GET' && $path === 'accounts') {
+    $stmt = $pdo->prepare('SELECT id, provider, provider_account_id, status, created_at FROM calendar_sync_accounts WHERE owner_mailbox = :owner ORDER BY created_at DESC');
+    $stmt->execute(['owner' => $owner]);
     jsonResponse(200, ['items' => $stmt->fetchAll(), 'csrf_token' => $_SESSION['csrf_token']]);
   }
 
-  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (in_array($method, ['POST','PATCH','DELETE'], true)) {
     $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     if (!is_string($csrfHeader) || !hash_equals($_SESSION['csrf_token'], $csrfHeader)) {
       denyCsrf();
     }
+  }
 
-    try {
-      $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
-    } catch (JsonException $e) {
-      jsonResponse(400, ['error' => 'Invalid JSON body']);
+  if ($method === 'POST' && $path === 'jobs') {
+    $input = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($input)) jsonResponse(400, ['error' => 'Invalid JSON body']);
+
+    $required = ['mailcow_calendar_id','external_account_id','external_calendar_id','direction','conflict_policy'];
+    foreach ($required as $f) {
+      if (!array_key_exists($f, $input)) jsonResponse(422, ['error' => "Missing field: {$f}"]);
     }
 
-    if (!is_array($input)) {
-      jsonResponse(400, ['error' => 'Invalid JSON body']);
-    }
+    $allowedDirections = ['two_way','mailcow_to_external','external_to_mailcow'];
+    $allowedPolicies = ['newest_wins','prefer_mailcow','prefer_external','manual'];
+    if (!in_array((string)$input['direction'], $allowedDirections, true)) jsonResponse(422, ['error' => 'Unsupported direction']);
+    if (!in_array((string)$input['conflict_policy'], $allowedPolicies, true)) jsonResponse(422, ['error' => 'Unsupported conflict policy']);
 
-    $errors = [];
-    $requiredStringFields = [
-      'name' => 120,
-      'email_a' => 255,
-      'email_b' => 255,
-      'provider_a' => 32,
-      'provider_b' => 32,
-      'sync_direction' => 16,
-      'mailcow_secret' => 255,
-    ];
+    $accountStmt = $pdo->prepare('SELECT id FROM calendar_sync_accounts WHERE id = :id AND owner_mailbox = :owner');
+    $accountStmt->execute(['id' => (int)$input['external_account_id'], 'owner' => $owner]);
+    if (!$accountStmt->fetch()) jsonResponse(403, ['error' => 'Invalid account ownership']);
 
-    foreach ($requiredStringFields as $field => $maxLength) {
-      if (!array_key_exists($field, $input)) {
-        $errors[$field][] = 'This field is required.';
-        continue;
-      }
-      if (!is_string($input[$field])) {
-        $errors[$field][] = 'This field must be a string.';
-        continue;
-      }
-
-      $input[$field] = trim($input[$field]);
-      if ($input[$field] === '') {
-        $errors[$field][] = 'This field cannot be empty.';
-        continue;
-      }
-
-      if (mb_strlen($input[$field]) > $maxLength) {
-        $errors[$field][] = sprintf('Must be %d characters or fewer.', $maxLength);
-      }
-    }
-
-    foreach (['email_a', 'email_b'] as $emailField) {
-      if (isset($input[$emailField]) && is_string($input[$emailField]) && $input[$emailField] !== ''
-        && filter_var($input[$emailField], FILTER_VALIDATE_EMAIL) === false) {
-        $errors[$emailField][] = 'Must be a valid email address.';
-      }
-    }
-
-    $allowedProviders = ['mailcow', 'google', 'outlook'];
-    $allowedDirections = ['two_way', 'a_to_b', 'b_to_a'];
-    if (isset($input['provider_a']) && is_string($input['provider_a']) && $input['provider_a'] !== ''
-      && !in_array($input['provider_a'], $allowedProviders, true)) {
-      $errors['provider_a'][] = 'Unsupported provider.';
-    }
-    if (isset($input['provider_b']) && is_string($input['provider_b']) && $input['provider_b'] !== ''
-      && !in_array($input['provider_b'], $allowedProviders, true)) {
-      $errors['provider_b'][] = 'Unsupported provider.';
-    }
-    if (isset($input['sync_direction']) && is_string($input['sync_direction']) && $input['sync_direction'] !== ''
-      && !in_array($input['sync_direction'], $allowedDirections, true)) {
-      $errors['sync_direction'][] = 'Unsupported sync direction.';
-    }
-
-    if (!empty($errors)) {
-      jsonResponse(422, ['error' => 'Validation failed', 'errors' => $errors]);
-    }
-
-    $hashedSecret = password_hash((string)$input['mailcow_secret'], PASSWORD_ARGON2ID);
-
-    $stmt = $pdo->prepare('INSERT INTO calendar_sync_links (owner, name, email_a, email_b, provider_a, provider_b, sync_direction, secret_hash, status) VALUES (:owner, :name, :email_a, :email_b, :provider_a, :provider_b, :sync_direction, :secret_hash, :status)');
+    $stmt = $pdo->prepare('INSERT INTO calendar_sync_jobs (owner_mailbox, mailcow_calendar_id, external_account_id, external_calendar_id, direction, conflict_policy, interval_seconds, enabled, status, next_run_at) VALUES (:owner, :mailcow_calendar_id, :external_account_id, :external_calendar_id, :direction, :conflict_policy, :interval_seconds, 1, :status, DATE_ADD(NOW(), INTERVAL 1 MINUTE))');
     $stmt->execute([
-      'owner' => $_SESSION['mailcow_user'],
-      'name' => $input['name'],
-      'email_a' => (string)$input['email_a'],
-      'email_b' => (string)$input['email_b'],
-      'provider_a' => (string)$input['provider_a'],
-      'provider_b' => (string)$input['provider_b'],
-      'sync_direction' => (string)$input['sync_direction'],
-      'secret_hash' => $hashedSecret,
-      'status' => 'pending_auth',
+      'owner' => $owner,
+      'mailcow_calendar_id' => mb_substr((string)$input['mailcow_calendar_id'], 0, 255),
+      'external_account_id' => (int)$input['external_account_id'],
+      'external_calendar_id' => mb_substr((string)$input['external_calendar_id'], 0, 255),
+      'direction' => (string)$input['direction'],
+      'conflict_policy' => (string)$input['conflict_policy'],
+      'interval_seconds' => max(60, min(3600, (int)($input['interval_seconds'] ?? 300))),
+      'status' => 'idle',
     ]);
 
-    jsonResponse(201, ['ok' => true]);
+    $jobId = (int)$pdo->lastInsertId();
+    audit($pdo, $owner, 'job_create', 'job', $jobId, 'success');
+    jsonResponse(201, ['ok' => true, 'id' => $jobId]);
+  }
+
+  if ($method === 'POST' && $path === 'accounts') {
+    $input = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($input)) jsonResponse(400, ['error' => 'Invalid JSON body']);
+
+    $provider = (string)($input['provider'] ?? '');
+    if (!in_array($provider, ['google','microsoft'], true)) jsonResponse(422, ['error' => 'Unsupported provider']);
+
+    $stmt = $pdo->prepare('INSERT INTO calendar_sync_accounts (owner_mailbox, provider, provider_account_id, encrypted_access_token, encrypted_refresh_token, token_expires_at, scopes, status) VALUES (:owner,:provider,:provider_account_id,:access,:refresh,:expires,:scopes,:status)');
+    $stmt->execute([
+      'owner' => $owner,
+      'provider' => $provider,
+      'provider_account_id' => mb_substr((string)($input['provider_account_id'] ?? uniqid($provider . '_', true)), 0, 255),
+      'access' => 'oauth_token_placeholder',
+      'refresh' => 'oauth_refresh_placeholder',
+      'expires' => date('Y-m-d H:i:s', time() + 3600),
+      'scopes' => (string)($input['scopes'] ?? 'calendar.readwrite'),
+      'status' => 'active',
+    ]);
+    $accountId = (int)$pdo->lastInsertId();
+    audit($pdo, $owner, 'account_connect', 'account', $accountId, 'success', ['provider' => $provider]);
+    jsonResponse(201, ['ok' => true, 'id' => $accountId]);
   }
 
   jsonResponse(405, ['error' => 'Method not allowed']);

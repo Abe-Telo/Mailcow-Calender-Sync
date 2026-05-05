@@ -11,180 +11,155 @@
     label { display: block; margin-top: .5rem; }
     input, select, button { width: 100%; padding: .5rem; margin-top: .25rem; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .inline { display: flex; gap: 0.5rem; align-items: center; }
-    .inline input { width: auto; }
-    .provider-auth { margin-top: .5rem; display: none; }
   </style>
 </head>
 <body>
-  <h1>Two-Way Calendar Sync</h1>
-  <p>Logged-in Mailcow users can create multiple calendar sync links (Google/Outlook/CalDAV).</p>
+  <h1>Calendar Sync</h1>
 
   <div class="card">
-    <h2>Add sync</h2>
-    <form id="syncForm">
-      <input id="csrfToken" type="hidden" name="csrf_token" value="" />
-      <label>Sync name</label>
-      <input id="name" maxlength="120" required />
-
-      <div class="row">
-        <div>
-          <label>Calendar A email</label>
-          <input id="emailA" type="email" required />
-          <label>Provider A</label>
-          <select id="providerA" required>
-            <option value="mailcow">Mailcow</option>
-            <option value="google">Google Calendar</option>
-            <option value="outlook">Outlook Calendar</option>
-          </select>
-          <div id="googleAuthA" class="provider-auth">
-            <button type="button" onclick="connectGoogle('A')">Connect Google (A)</button>
-          </div>
-        </div>
-        <div>
-          <label>Calendar B email</label>
-          <input id="emailB" type="email" required />
-          <label>Provider B</label>
-          <select id="providerB" required>
-            <option value="mailcow">Mailcow</option>
-            <option value="google">Google Calendar</option>
-            <option value="outlook">Outlook Calendar</option>
-          </select>
-          <div id="googleAuthB" class="provider-auth">
-            <button type="button" onclick="connectGoogle('B')">Connect Google (B)</button>
-          </div>
-        </div>
-      </div>
-
-      <label>Sync direction</label>
-      <select id="syncDirection" required>
-        <option value="two_way">Two-way sync (A ↔ B)</option>
-        <option value="a_to_b">One-way sync (A → B)</option>
-        <option value="b_to_a">One-way sync (B → A)</option>
+    <h2>Connect external account</h2>
+    <form id="accountForm">
+      <label>Provider</label>
+      <select id="provider" required>
+        <option value="google">Google Calendar</option>
+        <option value="microsoft">Outlook / Microsoft 365</option>
       </select>
-
-      <label>Mailcow password (or app password)</label>
-      <input id="mailcowSecret" type="password" autocomplete="new-password" required />
-
-      <button type="submit">Add</button>
+      <button type="submit">Connect account (stub)</button>
     </form>
   </div>
 
   <div class="card">
-    <h2>Existing syncs</h2>
-    <table id="syncTable" width="100%">
-      <thead><tr><th>Name</th><th>A</th><th>B</th><th>Direction</th><th>Status</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <h2>Create sync job</h2>
+    <form id="jobForm">
+      <label>Mailcow Calendar ID</label>
+      <input id="mailcowCalendarId" value="default" required />
+
+      <label>External account</label>
+      <select id="externalAccountId" required></select>
+
+      <label>External calendar ID</label>
+      <input id="externalCalendarId" placeholder="primary" required />
+
+      <label>Direction</label>
+      <select id="direction" required>
+        <option value="two_way">Two-way</option>
+        <option value="mailcow_to_external">Mailcow to external only</option>
+        <option value="external_to_mailcow">External to Mailcow only</option>
+      </select>
+
+      <label>Conflict policy</label>
+      <select id="conflictPolicy" required>
+        <option value="newest_wins">Newest update wins</option>
+        <option value="prefer_mailcow">Prefer Mailcow</option>
+        <option value="prefer_external">Prefer external calendar</option>
+        <option value="manual">Manual conflict handling</option>
+      </select>
+
+      <label>Sync interval (seconds)</label>
+      <input id="intervalSeconds" type="number" min="60" max="3600" value="300" required />
+
+      <button type="submit">Create sync job</button>
+    </form>
   </div>
 
-  <script>
-    const providerA = document.getElementById('providerA');
-    const providerB = document.getElementById('providerB');
+  <div class="card">
+    <h2>Connected accounts</h2>
+    <table width="100%"><thead><tr><th>ID</th><th>Provider</th><th>Account</th><th>Status</th></tr></thead><tbody id="accountsBody"></tbody></table>
+  </div>
 
-    function hydrateCsrfToken(serverToken = '') {
-      const fallbackToken = typeof window.CALENDAR_SYNC_CSRF_TOKEN === 'string' ? window.CALENDAR_SYNC_CSRF_TOKEN : '';
-      const token = typeof serverToken === 'string' && serverToken.length > 0 ? serverToken : fallbackToken;
-      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-      const csrfInput = document.getElementById('csrfToken');
-      csrfMeta.setAttribute('content', token);
-      csrfInput.value = token;
-      return token;
-    }
+  <div class="card">
+    <h2>Sync jobs</h2>
+    <table width="100%"><thead><tr><th>ID</th><th>Provider</th><th>Direction</th><th>Policy</th><th>Status</th><th>Last error</th></tr></thead><tbody id="jobsBody"></tbody></table>
+  </div>
 
-    function getCsrfToken() {
-      const csrfInput = document.getElementById('csrfToken');
-      return csrfInput.value;
-    }
+<script>
+  function setCsrf(token) {
+    document.querySelector('meta[name="csrf-token"]').setAttribute('content', token || '');
+  }
+  function csrf() { return document.querySelector('meta[name="csrf-token"]').getAttribute('content') || ''; }
 
-    function updateProviderAuthVisibility() {
-      document.getElementById('googleAuthA').style.display = providerA.value === 'google' ? 'block' : 'none';
-      document.getElementById('googleAuthB').style.display = providerB.value === 'google' ? 'block' : 'none';
-    }
+  async function readErrorMessage(response, fallback) {
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === 'string' && data.error.length > 0) return data.error;
+    } catch (e) {}
+    return fallback + ` (HTTP ${response.status})`;
+  }
 
-    function connectGoogle(side) {
-      const popup = window.open('/api/oauth/google/start.php?side=' + encodeURIComponent(side), 'googleOAuth', 'width=520,height=700');
-      if (!popup) alert('Please allow popups to connect Google Calendar.');
-    }
-
-    providerA.addEventListener('change', updateProviderAuthVisibility);
-    providerB.addEventListener('change', updateProviderAuthVisibility);
-
-    async function loadSyncs() {
-      const r = await fetch('/api/calendar-sync.php', { credentials: 'include' });
-      if (!r.ok) return;
-      const data = await r.json();
-      hydrateCsrfToken(data.csrf_token);
-      const tbody = document.querySelector('#syncTable tbody');
-      tbody.innerHTML = '';
-      for (const s of data.items || []) {
-        const tr = document.createElement('tr');
-
-        const nameCell = document.createElement('td');
-        nameCell.textContent = s.name;
-
-        const calendarACell = document.createElement('td');
-        calendarACell.textContent = `${s.email_a} (${s.provider_a})`;
-
-        const calendarBCell = document.createElement('td');
-        calendarBCell.textContent = `${s.email_b} (${s.provider_b})`;
-
-        const directionCell = document.createElement('td');
-        directionCell.textContent = s.sync_direction;
-
-        const statusCell = document.createElement('td');
-        statusCell.textContent = s.status;
-
-        tr.appendChild(nameCell);
-        tr.appendChild(calendarACell);
-        tr.appendChild(calendarBCell);
-        tr.appendChild(directionCell);
-        tr.appendChild(statusCell);
-        tbody.appendChild(tr);
-      }
-    }
-
-    document.getElementById('syncForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      let csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        await loadSyncs();
-        csrfToken = getCsrfToken();
-      }
-      if (!csrfToken) {
-        alert('Unable to create sync: CSRF token is unavailable. Refresh the page and try again.');
-        return;
-      }
-      const payload = {
-        name: document.getElementById('name').value.trim(),
-        email_a: document.getElementById('emailA').value.trim(),
-        email_b: document.getElementById('emailB').value.trim(),
-        provider_a: providerA.value,
-        provider_b: providerB.value,
-        sync_direction: document.getElementById('syncDirection').value,
-        mailcow_secret: document.getElementById('mailcowSecret').value
-      };
-      const r = await fetch('/api/calendar-sync.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        credentials: 'include',
-        body: JSON.stringify(payload)
+  async function loadAccounts() {
+    const r = await fetch('/api/calendar-sync.php?path=accounts', { credentials: 'include' });
+    if (!r.ok) return [];
+    const data = await r.json();
+    setCsrf(data.csrf_token);
+    const tbody = document.getElementById('accountsBody'); tbody.innerHTML = '';
+    const select = document.getElementById('externalAccountId'); select.innerHTML = '';
+    (data.items || []).forEach((a) => {
+      const tr = document.createElement('tr');
+      ['id','provider','provider_account_id','status'].forEach((k) => {
+        const td = document.createElement('td'); td.textContent = String(a[k] ?? ''); tr.appendChild(td);
       });
-      if (r.ok) {
-        document.getElementById('syncForm').reset();
-        updateProviderAuthVisibility();
-        await loadSyncs();
-      } else {
-        alert('Unable to create sync. Check login and inputs.');
-      }
-    });
+      tbody.appendChild(tr);
 
-    hydrateCsrfToken();
-    updateProviderAuthVisibility();
-    loadSyncs();
-  </script>
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.id} - ${a.provider} (${a.provider_account_id})`;
+      select.appendChild(opt);
+    });
+    return data.items || [];
+  }
+
+  async function loadJobs() {
+    const r = await fetch('/api/calendar-sync.php?path=jobs', { credentials: 'include' });
+    if (!r.ok) return;
+    const data = await r.json();
+    setCsrf(data.csrf_token);
+    const tbody = document.getElementById('jobsBody'); tbody.innerHTML = '';
+    (data.items || []).forEach((j) => {
+      const tr = document.createElement('tr');
+      [j.id, j.provider, j.direction, j.conflict_policy, j.status, j.last_error_message || ''].forEach((v) => {
+        const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('accountForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = { provider: document.getElementById('provider').value };
+    const r = await fetch('/api/calendar-sync.php?path=accounts', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { alert(await readErrorMessage(r, 'Failed to connect account')); return; }
+    await loadAccounts();
+  });
+
+  document.getElementById('jobForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      mailcow_calendar_id: document.getElementById('mailcowCalendarId').value.trim(),
+      external_account_id: Number(document.getElementById('externalAccountId').value),
+      external_calendar_id: document.getElementById('externalCalendarId').value.trim(),
+      direction: document.getElementById('direction').value,
+      conflict_policy: document.getElementById('conflictPolicy').value,
+      interval_seconds: Number(document.getElementById('intervalSeconds').value),
+    };
+    const r = await fetch('/api/calendar-sync.php?path=jobs', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { alert(await readErrorMessage(r, 'Failed to create job')); return; }
+    await loadJobs();
+  });
+
+  (async function init() {
+    await loadAccounts();
+    await loadJobs();
+  })();
+</script>
 </body>
 </html>
