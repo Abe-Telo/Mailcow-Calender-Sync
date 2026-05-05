@@ -92,6 +92,12 @@ This ensures stale tokens from prior sessions cannot be reused.
 - Session-auth requirement (`401` for unauthenticated users)
 - CSRF validation on POST (`403` on mismatch/missing header)
 - Provider and sync-direction allowlists
+- Strict input validation for `POST /api/calendar-sync.php` with `422` field-level errors:
+  - Required string fields: `name`, `email_a`, `email_b`, `provider_a`, `provider_b`, `sync_direction`, `mailcow_secret`
+  - Trimmed non-empty values
+  - Length constraints: `name` ≤ 120, `email_a`/`email_b` ≤ 255, `provider_a`/`provider_b` ≤ 32, `sync_direction` ≤ 16, `mailcow_secret` ≤ 255
+  - Email format checks via `filter_var(..., FILTER_VALIDATE_EMAIL)`
+  - Explicit rejection of empty `mailcow_secret` before hashing
 - Password hashing using Argon2id (never plaintext storage)
 - Prepared SQL statements for inserts/selects
 

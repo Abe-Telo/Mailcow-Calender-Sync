@@ -53,16 +53,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
+  $errors = [];
+  $requiredStringFields = [
+    'name' => 120,
+    'email_a' => 255,
+    'email_b' => 255,
+    'provider_a' => 32,
+    'provider_b' => 32,
+    'sync_direction' => 16,
+    'mailcow_secret' => 255,
+  ];
+
+  foreach ($requiredStringFields as $field => $maxLength) {
+    if (!array_key_exists($field, $input)) {
+      $errors[$field][] = 'This field is required.';
+      continue;
+    }
+    if (!is_string($input[$field])) {
+      $errors[$field][] = 'This field must be a string.';
+      continue;
+    }
+
+    $input[$field] = trim($input[$field]);
+    if ($input[$field] === '') {
+      $errors[$field][] = 'This field cannot be empty.';
+      continue;
+    }
+
+    if (mb_strlen($input[$field]) > $maxLength) {
+      $errors[$field][] = sprintf('Must be %d characters or fewer.', $maxLength);
+    }
+  }
+
+  foreach (['email_a', 'email_b'] as $emailField) {
+    if (isset($input[$emailField]) && is_string($input[$emailField]) && $input[$emailField] !== ''
+      && filter_var($input[$emailField], FILTER_VALIDATE_EMAIL) === false) {
+      $errors[$emailField][] = 'Must be a valid email address.';
+    }
+  }
+
   $allowedProviders = ['mailcow', 'google', 'outlook'];
   $allowedDirections = ['two_way', 'a_to_b', 'b_to_a'];
-  if (!in_array($input['provider_a'] ?? '', $allowedProviders, true) || !in_array($input['provider_b'] ?? '', $allowedProviders, true)) {
+  if (isset($input['provider_a']) && is_string($input['provider_a']) && $input['provider_a'] !== ''
+    && !in_array($input['provider_a'], $allowedProviders, true)) {
+    $errors['provider_a'][] = 'Unsupported provider.';
+  }
+  if (isset($input['provider_b']) && is_string($input['provider_b']) && $input['provider_b'] !== ''
+    && !in_array($input['provider_b'], $allowedProviders, true)) {
+    $errors['provider_b'][] = 'Unsupported provider.';
+  }
+  if (isset($input['sync_direction']) && is_string($input['sync_direction']) && $input['sync_direction'] !== ''
+    && !in_array($input['sync_direction'], $allowedDirections, true)) {
+    $errors['sync_direction'][] = 'Unsupported sync direction.';
+  }
+
+  if (!empty($errors)) {
     http_response_code(422);
-    echo json_encode(['error' => 'Unsupported provider']);
+    echo json_encode(['error' => 'Validation failed', 'errors' => $errors]);
     exit;
   }
-  if (!in_array($input['sync_direction'] ?? '', $allowedDirections, true)) {
+
+  if ($input['mailcow_secret'] === '') {
     http_response_code(422);
-    echo json_encode(['error' => 'Unsupported sync direction']);
+    echo json_encode(['error' => 'Validation failed', 'errors' => ['mailcow_secret' => ['This field cannot be empty.']]]);
     exit;
   }
 
@@ -71,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $stmt = $pdo->prepare('INSERT INTO calendar_sync_links (owner, name, email_a, email_b, provider_a, provider_b, sync_direction, secret_hash, status) VALUES (:owner, :name, :email_a, :email_b, :provider_a, :provider_b, :sync_direction, :secret_hash, :status)');
   $stmt->execute([
     'owner' => $_SESSION['mailcow_user'],
-    'name' => mb_substr((string)$input['name'], 0, 120),
+    'name' => $input['name'],
     'email_a' => (string)$input['email_a'],
     'email_b' => (string)$input['email_b'],
     'provider_a' => (string)$input['provider_a'],
