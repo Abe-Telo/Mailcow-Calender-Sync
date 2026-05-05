@@ -69,7 +69,11 @@
       tbody.innerHTML = '';
       for (const s of data.items || []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td><td>${s.email_a}</td><td>${s.email_b}</td><td>${s.status}</td>`;
+        for (const value of [s.name, s.email_a, s.email_b, s.status]) {
+          const td = document.createElement('td');
+          td.textContent = value ?? '';
+          tr.appendChild(td);
+        }
         tbody.appendChild(tr);
       }
     }
