@@ -119,7 +119,27 @@
       tbody.innerHTML = '';
       for (const s of data.items || []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td><td>${s.email_a} (${s.provider_a})</td><td>${s.email_b} (${s.provider_b})</td><td>${s.sync_direction}</td><td>${s.status}</td>`;
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = s.name;
+
+        const calendarACell = document.createElement('td');
+        calendarACell.textContent = `${s.email_a} (${s.provider_a})`;
+
+        const calendarBCell = document.createElement('td');
+        calendarBCell.textContent = `${s.email_b} (${s.provider_b})`;
+
+        const directionCell = document.createElement('td');
+        directionCell.textContent = s.sync_direction;
+
+        const statusCell = document.createElement('td');
+        statusCell.textContent = s.status;
+
+        tr.appendChild(nameCell);
+        tr.appendChild(calendarACell);
+        tr.appendChild(calendarBCell);
+        tr.appendChild(directionCell);
+        tr.appendChild(statusCell);
         tbody.appendChild(tr);
       }
     }
