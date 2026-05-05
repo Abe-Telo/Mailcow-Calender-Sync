@@ -4,6 +4,17 @@ declare(strict_types=1);
 session_start();
 header('Content-Type: application/json');
 
+
+function denyCsrf(): void {
+  http_response_code(403);
+  echo json_encode(['error' => 'CSRF validation failed']);
+  exit;
+}
+
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+  $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if (!isset($_SESSION['mailcow_user']) || empty($_SESSION['mailcow_user'])) {
   http_response_code(401);
   echo json_encode(['error' => 'Authentication required']);
@@ -23,6 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+  if (!is_string($csrfHeader) || !hash_equals($_SESSION['csrf_token'], $csrfHeader)) {
+    denyCsrf();
+  }
+
   try {
     $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
   } catch (JsonException $e) {

@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Calendar Sync</title>
+  <meta name="csrf-token" content="" />
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
@@ -22,6 +23,7 @@
   <div class="card">
     <h2>Add sync</h2>
     <form id="syncForm">
+      <input id="csrfToken" type="hidden" name="csrf_token" value="" />
       <label>Sync name</label>
       <input id="name" maxlength="120" required />
 
@@ -80,6 +82,19 @@
     const providerA = document.getElementById('providerA');
     const providerB = document.getElementById('providerB');
 
+    function hydrateCsrfToken() {
+      const serverToken = typeof window.CALENDAR_SYNC_CSRF_TOKEN === 'string' ? window.CALENDAR_SYNC_CSRF_TOKEN : '';
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      const csrfInput = document.getElementById('csrfToken');
+      csrfMeta.setAttribute('content', serverToken);
+      csrfInput.value = serverToken;
+    }
+
+    function getCsrfToken() {
+      const csrfInput = document.getElementById('csrfToken');
+      return csrfInput.value;
+    }
+
     function updateProviderAuthVisibility() {
       document.getElementById('googleAuthA').style.display = providerA.value === 'google' ? 'block' : 'none';
       document.getElementById('googleAuthB').style.display = providerB.value === 'google' ? 'block' : 'none';
@@ -119,7 +134,10 @@
       };
       const r = await fetch('/api/calendar-sync.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken()
+        },
         credentials: 'include',
         body: JSON.stringify(payload)
       });
@@ -132,6 +150,7 @@
       }
     });
 
+    hydrateCsrfToken();
     updateProviderAuthVisibility();
     loadSyncs();
   </script>
