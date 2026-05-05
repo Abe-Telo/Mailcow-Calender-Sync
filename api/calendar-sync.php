@@ -29,7 +29,7 @@ $pdo = new PDO(getenv('MC_DB_DSN'), getenv('MC_DB_USER'), getenv('MC_DB_PASS'), 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
   $stmt = $pdo->prepare('SELECT id, name, email_a, email_b, provider_a, provider_b, sync_direction, status FROM calendar_sync_links WHERE owner = :owner ORDER BY created_at DESC');
   $stmt->execute(['owner' => $_SESSION['mailcow_user']]);
-  echo json_encode(['items' => $stmt->fetchAll()]);
+  echo json_encode(['items' => $stmt->fetchAll(), 'csrf_token' => $_SESSION['csrf_token']]);
   exit;
 }
 
