@@ -4,6 +4,17 @@ declare(strict_types=1);
 session_start();
 header('Content-Type: application/json');
 
+
+function denyCsrf(): void {
+  http_response_code(403);
+  echo json_encode(['error' => 'CSRF validation failed']);
+  exit;
+}
+
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+  $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if (!isset($_SESSION['mailcow_user']) || empty($_SESSION['mailcow_user'])) {
   http_response_code(401);
   echo json_encode(['error' => 'Authentication required']);
@@ -18,11 +29,16 @@ $pdo = new PDO(getenv('MC_DB_DSN'), getenv('MC_DB_USER'), getenv('MC_DB_PASS'), 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
   $stmt = $pdo->prepare('SELECT id, name, email_a, email_b, provider_a, provider_b, sync_direction, status FROM calendar_sync_links WHERE owner = :owner ORDER BY created_at DESC');
   $stmt->execute(['owner' => $_SESSION['mailcow_user']]);
-  echo json_encode(['items' => $stmt->fetchAll()]);
+  echo json_encode(['items' => $stmt->fetchAll(), 'csrf_token' => $_SESSION['csrf_token']]);
   exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+  if (!is_string($csrfHeader) || !hash_equals($_SESSION['csrf_token'], $csrfHeader)) {
+    denyCsrf();
+  }
+
   try {
     $input = json_decode((string)file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
   } catch (JsonException $e) {
