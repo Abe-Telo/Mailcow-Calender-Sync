@@ -1,0 +1,7 @@
+# Attach Calendar Sync operator settings to php-fpm-mailcow.
+# This keeps MC_CALSYNC_CRYPTO_KEY and optional environment fallback
+# OAuth credentials available to the Calendar Sync API/OAuth routes.
+services:
+  php-fpm-mailcow:
+    env_file:
+      - ./mailcow-calendar-sync.env

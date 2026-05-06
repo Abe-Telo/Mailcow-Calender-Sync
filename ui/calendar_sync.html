@@ -3,163 +3,1949 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Calendar Sync</title>
-  <meta name="csrf-token" content="" />
+  <title>Mailcow Calendar Sync</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-    label { display: block; margin-top: .5rem; }
-    input, select, button { width: 100%; padding: .5rem; margin-top: .25rem; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    :root {
+      --bg: #f5f5f5;
+      --panel: #ffffff;
+      --border: #dddddd;
+      --border-soft: #e9e9e9;
+      --heading: #f5f5f5;
+      --text: #333333;
+      --muted: #777777;
+      --success: #28a745;
+      --success-dark: #218838;
+      --info: #17a2b8;
+      --warning: #f0ad4e;
+      --danger: #d9534f;
+      --tab-active: #ffffff;
+      --tab-inactive: #fafafa;
+      --shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.42857143 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .page {
+      max-width: 1440px;
+      margin: 24px auto 48px;
+      padding: 0 12px;
+    }
+
+    .page-header {
+      margin-bottom: 18px;
+    }
+
+    .page-header h1 {
+      margin: 0 0 4px;
+      font-size: 31px;
+      font-weight: 400;
+      line-height: 1.1;
+    }
+
+    .page-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .alert {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+    }
+
+    .alert strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .alert-info {
+      color: #31708f;
+      background: #d9edf7;
+      border-color: #bce8f1;
+    }
+
+    .alert-success {
+      color: #3c763d;
+      background: #dff0d8;
+      border-color: #d6e9c6;
+    }
+
+    .alert-warning {
+      color: #8a6d3b;
+      background: #fcf8e3;
+      border-color: #faebcc;
+    }
+
+    .alert-danger {
+      color: #a94442;
+      background: #f2dede;
+      border-color: #ebccd1;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      margin: 0 0 -1px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-button {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      background: var(--tab-inactive);
+      color: var(--text);
+      padding: 12px 18px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .tab-button.active {
+      background: var(--tab-active);
+      position: relative;
+      top: 1px;
+      font-weight: 600;
+    }
+
+    .tab-button.hidden {
+      display: none;
+    }
+
+    .tab-button:disabled {
+      cursor: not-allowed;
+      color: #999999;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 0 4px 4px 4px;
+      box-shadow: var(--shadow);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--heading);
+    }
+
+    .panel-heading h2 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      font-weight: 400;
+    }
+
+    .panel-heading p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .panel-body {
+      padding: 20px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 8px 12px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    .btn:hover {
+      filter: brightness(0.98);
+    }
+
+    .btn-default {
+      border-color: #cccccc;
+      background: #ffffff;
+    }
+
+    .btn-success {
+      border-color: var(--success);
+      background: var(--success);
+      color: #ffffff;
+    }
+
+    .btn-success:hover {
+      background: var(--success-dark);
+      border-color: var(--success-dark);
+    }
+
+    .btn-danger {
+      border-color: var(--danger);
+      background: var(--danger);
+      color: #ffffff;
+    }
+
+    .btn-info {
+      border-color: var(--info);
+      background: var(--info);
+      color: #ffffff;
+    }
+
+    .btn-xs {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    .btn[disabled] {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .form-card {
+      margin-bottom: 18px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fcfcfc;
+    }
+
+    .form-card h3 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 400;
+    }
+
+    .form-card p {
+      margin: 0 0 14px;
+      color: var(--muted);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px 16px;
+    }
+
+    .field {
+      grid-column: span 12;
+    }
+
+    .field.col-6 {
+      grid-column: span 6;
+    }
+
+    .field.col-4 {
+      grid-column: span 4;
+    }
+
+    .field.col-8 {
+      grid-column: span 8;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .field input,
+    .field select {
+      display: block;
+      width: 100%;
+      height: 36px;
+      padding: 6px 12px;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    .field input[readonly] {
+      background: #f7f7f7;
+    }
+
+    .field-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 27px;
+    }
+
+    .field-checkbox input {
+      width: auto;
+      height: auto;
+      margin: 0;
+    }
+
+    .help-block {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .note-box {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-left: 4px solid #5bc0de;
+      background: #f7fbfd;
+      color: #4f6d78;
+    }
+
+    .setup-guide {
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid var(--border-soft);
+      border-radius: 4px;
+      background: #ffffff;
+    }
+
+    .setup-guide h4 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .setup-guide p {
+      margin: 0 0 10px;
+      color: var(--muted);
+    }
+
+    .setup-guide ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .setup-guide li {
+      margin-bottom: 6px;
+    }
+
+    .note-box.hidden,
+    .hidden {
+      display: none !important;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .subpanel {
+      padding: 14px;
+      border: 1px solid var(--border-soft);
+      border-radius: 4px;
+      background: #ffffff;
+    }
+
+    .subpanel h4 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .subpanel p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      padding: 18px;
+      border: 1px dashed #d6d6d6;
+      border-radius: 4px;
+      color: var(--muted);
+      background: #fcfcfc;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border-soft);
+      border-radius: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+
+    thead th {
+      padding: 12px;
+      border-bottom: 2px solid #dddddd;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 700;
+      color: #222222;
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 12px;
+      border-top: 1px solid #eeeeee;
+      vertical-align: top;
+    }
+
+    .meta-line {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .badge-ready,
+    .badge-active,
+    .badge-configured {
+      color: #3c763d;
+      background: #dff0d8;
+    }
+
+    .badge-waiting,
+    .badge-pending,
+    .badge-disabled {
+      color: #8a6d3b;
+      background: #fcf8e3;
+    }
+
+    .badge-error,
+    .badge-revoked,
+    .badge-removed {
+      color: #a94442;
+      background: #f2dede;
+    }
+
+    .badge-running,
+    .badge-info {
+      color: #31708f;
+      background: #d9edf7;
+    }
+
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .mono {
+      font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      font-size: 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .inline-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 8px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inline-list li strong {
+      display: block;
+      font-size: 12px;
+      color: #666666;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .inline-list li span {
+      display: block;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    @media (max-width: 980px) {
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .field.col-6,
+      .field.col-4,
+      .field.col-8 {
+        grid-column: span 12;
+      }
+
+      .panel-heading {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        margin-top: 16px;
+      }
+
+      .page-header h1 {
+        font-size: 26px;
+      }
+
+      .tabs {
+        flex-direction: column;
+        border-bottom: none;
+      }
+
+      .tab-button {
+        border-bottom: 1px solid var(--border);
+        border-radius: 4px;
+      }
+
+      .tab-button.active {
+        top: 0;
+      }
+
+      .panel {
+        border-radius: 4px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Calendar Sync</h1>
+  <div class="page">
+    <div class="page-header">
+      <h1>Calendar sync</h1>
+      <p>Mailcow-style calendar links for mailbox users, with Google and Outlook provider setup controlled by Mailcow administrators.</p>
+    </div>
 
-  <div class="card">
-    <h2>Connect external account</h2>
-    <form id="accountForm">
-      <label>Provider</label>
-      <select id="provider" required>
-        <option value="google">Google Calendar</option>
-        <option value="microsoft">Outlook / Microsoft 365</option>
-      </select>
-      <button type="submit">Connect account (stub)</button>
-    </form>
+    <div id="globalNotice" class="alert hidden"></div>
+
+    <div id="sessionBanner" class="alert alert-info">
+      <strong>Loading Mailcow session</strong>
+      <span>Checking your mailbox access and provider setup status.</span>
+    </div>
+
+    <div class="tabs" id="tabNav">
+      <button type="button" class="tab-button active" data-tab="jobs">Sync links</button>
+      <button type="button" class="tab-button" data-tab="accounts">External accounts</button>
+      <button type="button" class="tab-button hidden" data-tab="providers" id="providerTabButton">Provider setup</button>
+    </div>
+
+    <section class="panel tab-panel active" data-tab-panel="jobs">
+      <div class="panel-heading">
+        <div>
+          <h2>Calendar sync links</h2>
+          <p>Create multiple sync definitions between the signed-in Mailcow mailbox and Google or Outlook calendars.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-success" id="openJobFormButton">+ Add sync link</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="jobsMailboxMessage" class="alert alert-warning hidden"></div>
+
+        <div id="jobFormCard" class="form-card hidden">
+          <h3>Add sync link</h3>
+          <p>Pick the two calendar email addresses you want to sync. For safety, one side must always be the signed-in Mailcow mailbox.</p>
+
+          <form id="jobForm">
+            <div class="form-grid">
+              <div class="field col-6">
+                <label for="syncLabel">Sync name</label>
+                <input id="syncLabel" maxlength="160" placeholder="Team calendar sync" />
+              </div>
+
+              <div class="field col-3">
+                <label for="syncMode">Direction</label>
+                <select id="syncMode" required>
+                  <option value="two_way">Two-way</option>
+                  <option value="a_to_b">Calendar A to Calendar B</option>
+                  <option value="b_to_a">Calendar B to Calendar A</option>
+                </select>
+              </div>
+
+              <div class="field col-3">
+                <label for="intervalSeconds">Interval (seconds)</label>
+                <select id="intervalSeconds" required>
+                  <option value="300">300</option>
+                  <option value="600">600</option>
+                  <option value="900">900</option>
+                  <option value="1800">1800</option>
+                  <option value="3600">3600</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="conflictPolicy">Conflict handling</label>
+                <select id="conflictPolicy" required>
+                  <option value="newest_wins">Newest change wins</option>
+                  <option value="prefer_mailcow">Prefer Mailcow</option>
+                  <option value="prefer_external">Prefer external provider</option>
+                  <option value="manual">Manual review</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="split" style="margin-top: 16px;">
+              <div class="subpanel">
+                <h4>Calendar A</h4>
+                <p>The first calendar email address you want to sync.</p>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="endpointAProvider">Provider</label>
+                    <select id="endpointAProvider" data-endpoint="a"></select>
+                  </div>
+
+                  <div class="field">
+                    <label for="endpointACalendarEmail">Calendar email</label>
+                    <input id="endpointACalendarEmail" type="email" placeholder="calendar-a@example.com" required />
+                    <div class="help-block" id="endpointAEmailHint"></div>
+                  </div>
+
+                  <div class="field hidden" id="endpointAAccountWrapper">
+                    <label for="endpointAAccountId">Authenticated external account</label>
+                    <select id="endpointAAccountId"></select>
+                    <div class="help-block" id="endpointAAccountHint"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="subpanel">
+                <h4>Calendar B</h4>
+                <p>The second calendar email address you want to sync.</p>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="endpointBProvider">Provider</label>
+                    <select id="endpointBProvider" data-endpoint="b"></select>
+                  </div>
+
+                  <div class="field">
+                    <label for="endpointBCalendarEmail">Calendar email</label>
+                    <input id="endpointBCalendarEmail" type="email" placeholder="calendar-b@example.com" required />
+                    <div class="help-block" id="endpointBEmailHint"></div>
+                  </div>
+
+                  <div class="field hidden" id="endpointBAccountWrapper">
+                    <label for="endpointBAccountId">Authenticated external account</label>
+                    <select id="endpointBAccountId"></select>
+                    <div class="help-block" id="endpointBAccountHint"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-success">Create sync link</button>
+              <button type="button" class="btn btn-default" id="closeJobFormButton">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="jobsEmpty" class="empty-state hidden">
+          No sync links yet. Use <strong>Add sync link</strong> to choose the two calendar emails that should stay in sync.
+        </div>
+
+        <div id="jobsTableWrap" class="table-wrap hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Calendar A</th>
+                <th>Calendar B</th>
+                <th>Direction</th>
+                <th>Status</th>
+                <th>Issue</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="jobsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel tab-panel" data-tab-panel="accounts">
+      <div class="panel-heading">
+        <div>
+          <h2>Connected external accounts</h2>
+          <p>Store Google and Outlook mailbox connections separately from sync jobs so OAuth access can be reviewed and reconnected safely.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-success" id="openAccountFormButton">+ Add external account</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="accountsMailboxMessage" class="alert alert-warning hidden"></div>
+
+        <div id="accountFormCard" class="form-card hidden">
+          <h3>Add external account</h3>
+          <p>Save the Google or Outlook account that should authenticate access. After saving, finish OAuth from the table below.</p>
+
+          <form id="accountForm">
+            <div class="form-grid">
+              <div class="field col-4">
+                <label for="accountProvider">Provider</label>
+                <select id="accountProvider" required></select>
+                <div class="help-block" id="accountProviderHint"></div>
+              </div>
+
+              <div class="field col-4">
+                <label for="providerAccountEmail">Provider account email</label>
+                <input id="providerAccountEmail" type="email" placeholder="calendar-owner@example.com" required />
+              </div>
+
+              <div class="field col-4">
+                <label for="providerDisplayName">Display name</label>
+                <input id="providerDisplayName" maxlength="120" placeholder="Work Google account" />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-success">Save external account</button>
+              <button type="button" class="btn btn-default" id="closeAccountFormButton">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="accountsEmpty" class="empty-state hidden">
+          No Google or Outlook accounts are saved yet. Add one here before using external calendars inside a sync link.
+        </div>
+
+        <div id="accountsTableWrap" class="table-wrap hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Authenticated account</th>
+                <th>Display name</th>
+                <th>Status</th>
+                <th>Provider setup</th>
+                <th>OAuth</th>
+              </tr>
+            </thead>
+            <tbody id="accountsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel tab-panel" data-tab-panel="providers">
+      <div class="panel-heading">
+        <div>
+          <h2>Provider setup</h2>
+          <p>Only Mailcow administrators can change Google and Outlook client settings. Secrets are encrypted on save and never shown again.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-default" data-provider-open="google">Configure Google</button>
+          <button type="button" class="btn btn-default" data-provider-open="microsoft">Configure Outlook</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="providerAdminMessage" class="alert alert-warning hidden"></div>
+
+        <div id="providerFormCard" class="form-card hidden">
+          <h3 id="providerFormTitle">Configure provider</h3>
+          <p id="providerFormIntro">Store provider credentials for all mailbox users on this Mailcow instance.</p>
+
+          <div id="providerFormNote" class="note-box"></div>
+          <div id="providerSetupGuide" class="setup-guide"></div>
+
+          <form id="providerForm">
+            <div class="form-grid">
+              <div class="field col-4">
+                <label for="providerName">Provider</label>
+                <select id="providerName" required>
+                  <option value="google">Google Calendar</option>
+                  <option value="microsoft">Outlook / Microsoft 365</option>
+                </select>
+              </div>
+
+              <div class="field col-4">
+                <label for="providerClientId">Client ID</label>
+                <input id="providerClientId" maxlength="255" required />
+              </div>
+
+              <div class="field col-4">
+                <label for="providerClientSecret">Client secret</label>
+                <input id="providerClientSecret" type="password" maxlength="4000" />
+                <div class="help-block" id="providerSecretHelp"></div>
+              </div>
+
+              <div class="field col-8">
+                <label for="providerRedirectUri">Redirect URI</label>
+                <input id="providerRedirectUri" maxlength="512" />
+              </div>
+
+              <div class="field col-4 hidden" id="providerTenantField">
+                <label for="providerTenantId">Tenant ID</label>
+                <input id="providerTenantId" maxlength="120" placeholder="common" />
+                <div class="help-block">Use <span class="mono">common</span> for mixed Microsoft tenants, or set a dedicated tenant ID.</div>
+              </div>
+
+              <div class="field col-8">
+                <label for="providerScopes">Scopes</label>
+                <input id="providerScopes" maxlength="1000" />
+              </div>
+
+              <div class="field col-4 field-checkbox">
+                <input id="providerEnabled" type="checkbox" checked />
+                <label for="providerEnabled" style="margin: 0;">Enabled for mailbox users</label>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-success">Save provider setup</button>
+              <button type="button" class="btn btn-default" id="closeProviderFormButton">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="providerTableWrap" class="table-wrap hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Client ID</th>
+                <th>Redirect URI</th>
+                <th>Updated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="providersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <div class="card">
-    <h2>Create sync job</h2>
-    <form id="jobForm">
-      <label>Mailcow Calendar ID</label>
-      <input id="mailcowCalendarId" value="default" required />
-
-      <label>External account</label>
-      <select id="externalAccountId" required></select>
-
-      <label>External calendar ID</label>
-      <input id="externalCalendarId" placeholder="primary" required />
-
-      <label>Direction</label>
-      <select id="direction" required>
-        <option value="two_way">Two-way</option>
-        <option value="mailcow_to_external">Mailcow to external only</option>
-        <option value="external_to_mailcow">External to Mailcow only</option>
-      </select>
-
-      <label>Conflict policy</label>
-      <select id="conflictPolicy" required>
-        <option value="newest_wins">Newest update wins</option>
-        <option value="prefer_mailcow">Prefer Mailcow</option>
-        <option value="prefer_external">Prefer external calendar</option>
-        <option value="manual">Manual conflict handling</option>
-      </select>
-
-      <label>Sync interval (seconds)</label>
-      <input id="intervalSeconds" type="number" min="60" max="3600" value="300" required />
-
-      <button type="submit">Create sync job</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Connected accounts</h2>
-    <table width="100%"><thead><tr><th>ID</th><th>Provider</th><th>Account</th><th>Status</th></tr></thead><tbody id="accountsBody"></tbody></table>
-  </div>
-
-  <div class="card">
-    <h2>Sync jobs</h2>
-    <table width="100%"><thead><tr><th>ID</th><th>Provider</th><th>Direction</th><th>Policy</th><th>Status</th><th>Last error</th></tr></thead><tbody id="jobsBody"></tbody></table>
-  </div>
-
-<script>
-  function setCsrf(token) {
-    document.querySelector('meta[name="csrf-token"]').setAttribute('content', token || '');
-  }
-  function csrf() { return document.querySelector('meta[name="csrf-token"]').getAttribute('content') || ''; }
-
-  async function readErrorMessage(response, fallback) {
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === 'string' && data.error.length > 0) return data.error;
-    } catch (e) {}
-    return fallback + ` (HTTP ${response.status})`;
-  }
-
-  async function loadAccounts() {
-    const r = await fetch('/api/calendar-sync.php?path=accounts', { credentials: 'include' });
-    if (!r.ok) return [];
-    const data = await r.json();
-    setCsrf(data.csrf_token);
-    const tbody = document.getElementById('accountsBody'); tbody.innerHTML = '';
-    const select = document.getElementById('externalAccountId'); select.innerHTML = '';
-    (data.items || []).forEach((a) => {
-      const tr = document.createElement('tr');
-      ['id','provider','provider_account_id','status'].forEach((k) => {
-        const td = document.createElement('td'); td.textContent = String(a[k] ?? ''); tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-
-      const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = `${a.id} - ${a.provider} (${a.provider_account_id})`;
-      select.appendChild(opt);
-    });
-    return data.items || [];
-  }
-
-  async function loadJobs() {
-    const r = await fetch('/api/calendar-sync.php?path=jobs', { credentials: 'include' });
-    if (!r.ok) return;
-    const data = await r.json();
-    setCsrf(data.csrf_token);
-    const tbody = document.getElementById('jobsBody'); tbody.innerHTML = '';
-    (data.items || []).forEach((j) => {
-      const tr = document.createElement('tr');
-      [j.id, j.provider, j.direction, j.conflict_policy, j.status, j.last_error_message || ''].forEach((v) => {
-        const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-  }
-
-  document.getElementById('accountForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const payload = { provider: document.getElementById('provider').value };
-    const r = await fetch('/api/calendar-sync.php?path=accounts', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) { alert(await readErrorMessage(r, 'Failed to connect account')); return; }
-    await loadAccounts();
-  });
-
-  document.getElementById('jobForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const payload = {
-      mailcow_calendar_id: document.getElementById('mailcowCalendarId').value.trim(),
-      external_account_id: Number(document.getElementById('externalAccountId').value),
-      external_calendar_id: document.getElementById('externalCalendarId').value.trim(),
-      direction: document.getElementById('direction').value,
-      conflict_policy: document.getElementById('conflictPolicy').value,
-      interval_seconds: Number(document.getElementById('intervalSeconds').value),
+  <script>
+    const state = {
+      csrfToken: '',
+      session: null,
+      providerSettings: [],
+      accounts: [],
+      jobs: [],
+      activeTab: 'jobs',
     };
-    const r = await fetch('/api/calendar-sync.php?path=jobs', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) { alert(await readErrorMessage(r, 'Failed to create job')); return; }
-    await loadJobs();
-  });
 
-  (async function init() {
-    await loadAccounts();
-    await loadJobs();
-  })();
-</script>
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '—';
+      const normalized = String(value).replace(' ', 'T');
+      const date = new Date(normalized);
+      if (Number.isNaN(date.getTime())) {
+        return String(value);
+      }
+
+      return date.toLocaleString();
+    }
+
+    function providerLabel(provider) {
+      if (provider === 'google') return 'Google Calendar';
+      if (provider === 'microsoft') return 'Outlook / Microsoft 365';
+      if (provider === 'mailcow') return 'Mailcow';
+      return provider;
+    }
+
+    function badgeClass(status) {
+      if (['active', 'configured', 'ready', 'idle'].includes(status)) return 'badge badge-active';
+      if (['running'].includes(status)) return 'badge badge-running';
+      if (['disabled', 'pending_oauth', 'awaiting_account', 'paused'].includes(status)) return 'badge badge-disabled';
+      if (['error', 'revoked', 'removed'].includes(status)) return 'badge badge-error';
+      return 'badge badge-info';
+    }
+
+    function showNotice(message, type = 'info') {
+      const notice = document.getElementById('globalNotice');
+      notice.className = `alert alert-${type}`;
+      notice.innerHTML = `<strong>${escapeHtml(type === 'danger' ? 'Action failed' : 'Notice')}</strong><span>${escapeHtml(message)}</span>`;
+      notice.classList.remove('hidden');
+    }
+
+    function clearNotice() {
+      const notice = document.getElementById('globalNotice');
+      notice.className = 'alert hidden';
+      notice.textContent = '';
+    }
+
+    async function readErrorMessage(response, fallback) {
+      try {
+        const data = await response.json();
+        if (data && typeof data.error === 'string' && data.error !== '') {
+          return data.error;
+        }
+      } catch (error) {
+        // Ignore JSON parse failures.
+      }
+
+      return `${fallback} (HTTP ${response.status})`;
+    }
+
+    async function apiRequest(path, options = {}) {
+      const params = new URLSearchParams();
+      params.set('path', path);
+
+      const query = options.query || {};
+      Object.keys(query).forEach((key) => {
+        if (query[key] !== undefined && query[key] !== null) {
+          params.set(key, String(query[key]));
+        }
+      });
+
+      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+      const method = options.method || 'GET';
+
+      if (['POST', 'PATCH', 'DELETE'].includes(method)) {
+        headers['X-CSRF-Token'] = state.csrfToken || '';
+      }
+
+      const fetchOptions = {
+        method,
+        headers,
+        credentials: 'same-origin',
+      };
+
+      if (options.body !== undefined) {
+        headers['Content-Type'] = 'application/json';
+        fetchOptions.body = JSON.stringify(options.body);
+      }
+
+      const response = await fetch(`/api/calendar-sync.php?${params.toString()}`, fetchOptions);
+      const rawText = await response.text();
+      let data = null;
+
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch (error) {
+          data = null;
+        }
+      }
+
+      if (!response.ok) {
+        const message = data && typeof data.error === 'string'
+          ? data.error
+          : `${options.fallbackError || 'Request failed'} (HTTP ${response.status})`;
+        const error = new Error(message);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      return data || {};
+    }
+
+    function getProviderSetting(provider) {
+      return state.providerSettings.find((item) => item.provider === provider) || null;
+    }
+
+    function upsertStateItem(collectionName, item) {
+      const items = Array.isArray(state[collectionName]) ? state[collectionName].slice() : [];
+      const index = items.findIndex((entry) => entry.id === item.id || entry.provider === item.provider);
+
+      if (index === -1) {
+        items.push(item);
+      } else {
+        items[index] = item;
+      }
+
+      state[collectionName] = items;
+    }
+
+    function removeProviderState(provider) {
+      state.providerSettings = state.providerSettings.filter((item) => item.provider !== provider);
+      ['google', 'microsoft'].forEach((candidate) => {
+        if (candidate === provider) {
+          state.providerSettings.push(providerTemplate(provider));
+        }
+      });
+      state.providerSettings.sort((left, right) => left.provider.localeCompare(right.provider));
+    }
+
+    function availableExternalProviders() {
+      return state.providerSettings.filter((item) => item.provider !== 'mailcow' && item.available_for_users);
+    }
+
+    function defaultExternalProvider() {
+      const available = availableExternalProviders();
+      if (available.length) {
+        return available[0].provider;
+      }
+
+      return 'google';
+    }
+
+    function setActiveTab(tabName) {
+      state.activeTab = tabName;
+
+      document.querySelectorAll('[data-tab]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.tab === tabName);
+      });
+
+      document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.tabPanel === tabName);
+      });
+    }
+
+    function renderSessionBanner() {
+      const banner = document.getElementById('sessionBanner');
+
+      if (!state.session || !state.session.authenticated) {
+        banner.className = 'alert alert-warning';
+        banner.innerHTML = '<strong>Mailcow login required</strong><span>Open this page from a valid Mailcow session to manage calendar sync settings.</span>';
+        return;
+      }
+
+      if (state.session.is_admin && !state.session.can_manage_syncs) {
+        banner.className = 'alert alert-info';
+        banner.innerHTML = `
+          <strong>Administrator session active</strong>
+          <span>Provider setup is available. Sign in as a mailbox user if you also want to create sync links or connect provider accounts.</span>
+          <ul class="inline-list">
+            <li><strong>Role</strong><span>${escapeHtml(state.session.role || 'admin')}</span></li>
+            <li><strong>Mailbox access</strong><span>Not active in this session</span></li>
+          </ul>
+        `;
+        return;
+      }
+
+      banner.className = 'alert alert-success';
+      banner.innerHTML = `
+        <strong>Mailcow session active</strong>
+        <span>Calendar sync actions are tied to this logged-in mailbox. External providers use OAuth, not mailbox passwords.</span>
+        <ul class="inline-list">
+          <li><strong>Mailbox</strong><span>${escapeHtml(state.session.mailbox || state.session.username || 'Unknown')}</span></li>
+          <li><strong>Role</strong><span>${escapeHtml(state.session.role || 'mailbox user')}</span></li>
+          <li><strong>Admin setup</strong><span>${state.session.is_admin ? 'Available in this session' : 'Only visible to administrators'}</span></li>
+        </ul>
+      `;
+    }
+
+    function renderTabs() {
+      const providerTabButton = document.getElementById('providerTabButton');
+      providerTabButton.classList.toggle('hidden', !(state.session && state.session.is_admin));
+
+      if (!(state.session && state.session.is_admin) && state.activeTab === 'providers') {
+        setActiveTab(state.session && state.session.can_manage_syncs ? 'jobs' : 'accounts');
+      }
+
+      if (state.session && state.session.is_admin && !state.session.can_manage_syncs && state.activeTab !== 'providers') {
+        setActiveTab('providers');
+      }
+    }
+
+    function renderAccountsMailboxMessage() {
+      const message = document.getElementById('accountsMailboxMessage');
+      const openButton = document.getElementById('openAccountFormButton');
+
+      if (!state.session || !state.session.can_manage_syncs) {
+        message.className = 'alert alert-warning';
+        message.innerHTML = '<strong>Mailbox session required</strong><span>Sign in as a mailbox user to save Google or Outlook accounts for sync.</span>';
+        message.classList.remove('hidden');
+        openButton.disabled = true;
+        return;
+      }
+
+      message.classList.add('hidden');
+      openButton.disabled = false;
+    }
+
+    function renderJobsMailboxMessage() {
+      const message = document.getElementById('jobsMailboxMessage');
+      const openButton = document.getElementById('openJobFormButton');
+
+      if (!state.session || !state.session.can_manage_syncs) {
+        message.className = 'alert alert-warning';
+        message.innerHTML = '<strong>Mailbox session required</strong><span>Sign in as a mailbox user to create or manage sync links.</span>';
+        message.classList.remove('hidden');
+        openButton.disabled = true;
+        return;
+      }
+
+      message.classList.add('hidden');
+      openButton.disabled = false;
+    }
+
+    function renderProviderAdminMessage() {
+      const message = document.getElementById('providerAdminMessage');
+      const toolbarButtons = document.querySelectorAll('[data-provider-open]');
+
+      if (!state.session || !state.session.is_admin) {
+        message.className = 'alert alert-warning';
+        message.innerHTML = '<strong>Administrator session required</strong><span>Only Mailcow administrators can save, enable, disable, or remove provider credentials.</span>';
+        message.classList.remove('hidden');
+        toolbarButtons.forEach((button) => {
+          button.disabled = true;
+        });
+        return;
+      }
+
+      message.classList.add('hidden');
+      toolbarButtons.forEach((button) => {
+        button.disabled = false;
+      });
+    }
+
+    function providerStatusCode(item) {
+      if (!item || !item.configured) return 'pending';
+      if (!item.enabled) return 'disabled';
+      return 'configured';
+    }
+
+    function renderProviderSettings() {
+      renderProviderAdminMessage();
+
+      const wrap = document.getElementById('providerTableWrap');
+      const tbody = document.getElementById('providersBody');
+      tbody.innerHTML = '';
+
+      if (!(state.session && state.session.is_admin)) {
+        wrap.classList.add('hidden');
+        document.getElementById('providerFormCard').classList.add('hidden');
+        return;
+      }
+
+      wrap.classList.remove('hidden');
+
+      state.providerSettings.forEach((item) => {
+        const tr = document.createElement('tr');
+        const updatedBy = item.updated_by || item.configured_by || '—';
+        const updatedAt = item.updated_at || item.configured_at;
+        const actions = [];
+
+        actions.push(`<button type="button" class="btn btn-default btn-xs" data-provider-action="edit" data-provider="${escapeHtml(item.provider)}">${item.configured ? 'Update setup' : 'Configure'}</button>`);
+
+        if (item.configured) {
+          actions.push(`<button type="button" class="btn btn-default btn-xs" data-provider-action="toggle" data-provider="${escapeHtml(item.provider)}" data-enabled="${item.enabled ? '0' : '1'}">${item.enabled ? 'Disable' : 'Enable'}</button>`);
+        }
+
+        if (item.can_remove) {
+          actions.push(`<button type="button" class="btn btn-danger btn-xs" data-provider-action="remove" data-provider="${escapeHtml(item.provider)}">Remove</button>`);
+        }
+
+        const sourceNote = item.managed_by_environment
+          ? '<div class="meta-line">Environment fallback is active.</div>'
+          : '<div class="meta-line">Managed from Calendar Sync UI.</div>';
+
+        tr.innerHTML = `
+          <td>
+            <strong>${escapeHtml(item.provider_label)}</strong>
+            ${sourceNote}
+          </td>
+          <td>
+            <span class="${badgeClass(providerStatusCode(item))}">${escapeHtml(item.status_label || 'Not configured')}</span>
+            <div class="meta-line">Secret ${item.secret_configured ? 'stored securely' : 'not saved yet'}</div>
+          </td>
+          <td class="mono">${escapeHtml(item.client_id || '—')}</td>
+          <td class="mono">${escapeHtml(item.redirect_uri || '—')}</td>
+          <td>
+            ${escapeHtml(formatDateTime(updatedAt))}
+            <div class="meta-line">By ${escapeHtml(updatedBy)}</div>
+          </td>
+          <td><div class="row-actions">${actions.join('')}</div></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAccounts() {
+      renderAccountsMailboxMessage();
+
+      const tbody = document.getElementById('accountsBody');
+      const empty = document.getElementById('accountsEmpty');
+      const wrap = document.getElementById('accountsTableWrap');
+      tbody.innerHTML = '';
+
+      if (!state.session || !state.session.can_manage_syncs) {
+        empty.classList.add('hidden');
+        wrap.classList.add('hidden');
+        document.getElementById('accountFormCard').classList.add('hidden');
+        return;
+      }
+
+      if (!state.accounts.length) {
+        empty.classList.remove('hidden');
+        wrap.classList.add('hidden');
+      } else {
+        empty.classList.add('hidden');
+        wrap.classList.remove('hidden');
+      }
+
+      state.accounts.forEach((account) => {
+        const tr = document.createElement('tr');
+        let oauthHtml = '<span class="muted">Connected</span>';
+
+        if (!account.oauth_ready) {
+          oauthHtml = `<span class="muted">${escapeHtml(account.provider_setup_status || 'Provider setup required')}</span>`;
+        } else if (account.oauth_connect_url) {
+          oauthHtml = `<a class="btn btn-default btn-xs" href="${escapeHtml(account.oauth_connect_url)}">${account.status === 'active' ? 'Reconnect OAuth' : 'Continue OAuth'}</a>`;
+        }
+
+        tr.innerHTML = `
+          <td>${escapeHtml(account.provider_label)}</td>
+          <td>
+            ${escapeHtml(account.provider_account_email)}
+            <div class="meta-line">Updated ${escapeHtml(formatDateTime(account.updated_at))}</div>
+          </td>
+          <td>${escapeHtml(account.display_name || '—')}</td>
+          <td><span class="${badgeClass(account.status)}">${escapeHtml(String(account.status).replace(/_/g, ' '))}</span></td>
+          <td>${escapeHtml(account.provider_setup_status || '—')}</td>
+          <td>${oauthHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      populateAccountProviderSelect();
+      updateEndpointControls('a');
+      updateEndpointControls('b');
+    }
+
+    function renderJobs() {
+      renderJobsMailboxMessage();
+
+      const tbody = document.getElementById('jobsBody');
+      const empty = document.getElementById('jobsEmpty');
+      const wrap = document.getElementById('jobsTableWrap');
+      tbody.innerHTML = '';
+
+      if (!state.session || !state.session.can_manage_syncs) {
+        empty.classList.add('hidden');
+        wrap.classList.add('hidden');
+        document.getElementById('jobFormCard').classList.add('hidden');
+        return;
+      }
+
+      if (!state.jobs.length) {
+        empty.classList.remove('hidden');
+        wrap.classList.add('hidden');
+      } else {
+        empty.classList.add('hidden');
+        wrap.classList.remove('hidden');
+      }
+
+      state.jobs.forEach((job) => {
+        const issueText = job.last_error_message || (job.status === 'awaiting_account' ? 'Complete OAuth for every external account before enabling.' : '—');
+        const toggleLabel = job.enabled ? 'Pause' : 'Enable';
+        const toggleDisabled = !job.enabled && !job.can_enable;
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>
+            <strong>${escapeHtml(job.sync_label)}</strong>
+            <div class="meta-line">Every ${escapeHtml(job.interval_seconds)} seconds</div>
+          </td>
+          <td>${escapeHtml(job.endpoint_a_summary)}</td>
+          <td>${escapeHtml(job.endpoint_b_summary)}</td>
+          <td>${escapeHtml(job.sync_mode_label)}</td>
+          <td><span class="${badgeClass(job.status)}">${escapeHtml(job.status_label)}</span></td>
+          <td>${escapeHtml(issueText)}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn btn-default btn-xs" data-job-action="toggle" data-job-id="${job.id}" data-enabled="${job.enabled ? '0' : '1'}" ${toggleDisabled ? 'disabled' : ''}>${toggleLabel}</button>
+              <button type="button" class="btn btn-danger btn-xs" data-job-action="delete" data-job-id="${job.id}">Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateAccountProviderSelect() {
+      const select = document.getElementById('accountProvider');
+      const hint = document.getElementById('accountProviderHint');
+      const currentValue = select.value;
+      select.innerHTML = '';
+
+      ['google', 'microsoft'].forEach((provider) => {
+        const setting = getProviderSetting(provider);
+        const option = document.createElement('option');
+        option.value = provider;
+        option.textContent = providerLabel(provider);
+
+        if (!setting || !setting.available_for_users) {
+          option.disabled = true;
+          option.textContent += ' (admin setup required)';
+        }
+
+        select.appendChild(option);
+      });
+
+      if ([...select.options].some((option) => option.value === currentValue && !option.disabled)) {
+        select.value = currentValue;
+      } else {
+        const firstEnabled = [...select.options].find((option) => !option.disabled);
+        if (firstEnabled) {
+          select.value = firstEnabled.value;
+        }
+      }
+
+      const selectedOption = select.selectedOptions[0];
+      hint.textContent = selectedOption && !selectedOption.disabled
+        ? 'The connected external account can later be reused by multiple sync links.'
+        : 'An administrator must enable Google or Outlook provider setup before mailbox users can connect accounts.';
+    }
+
+    function populateEndpointProviderSelect(selectId, includeMailcow, selectedProvider) {
+      const select = document.getElementById(selectId);
+      const current = selectedProvider || select.value;
+      select.innerHTML = '';
+
+      if (includeMailcow) {
+        const mailcowOption = document.createElement('option');
+        mailcowOption.value = 'mailcow';
+        mailcowOption.textContent = 'Mailcow';
+        select.appendChild(mailcowOption);
+      }
+
+      ['google', 'microsoft'].forEach((provider) => {
+        const setting = getProviderSetting(provider);
+        const option = document.createElement('option');
+        option.value = provider;
+        option.textContent = providerLabel(provider);
+
+        if (!setting || !setting.available_for_users) {
+          option.disabled = true;
+          option.textContent += ' (admin setup required)';
+        }
+
+        select.appendChild(option);
+      });
+
+      if ([...select.options].some((option) => option.value === current && !option.disabled)) {
+        select.value = current;
+      } else if (includeMailcow) {
+        select.value = 'mailcow';
+      } else {
+        const firstEnabled = [...select.options].find((option) => !option.disabled);
+        if (firstEnabled) {
+          select.value = firstEnabled.value;
+        }
+      }
+    }
+
+    function fillEndpointAccountSelect(endpointKey, provider) {
+      const select = document.getElementById(`endpoint${endpointKey.toUpperCase()}AccountId`);
+      const hint = document.getElementById(`endpoint${endpointKey.toUpperCase()}AccountHint`);
+      const accounts = state.accounts.filter((account) => account.provider === provider);
+      const previousValue = select.value;
+      select.innerHTML = '';
+
+      if (!accounts.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = `No ${providerLabel(provider)} account saved`;
+        select.appendChild(option);
+        select.disabled = true;
+        hint.textContent = `Save a ${providerLabel(provider)} account in the External accounts tab first.`;
+        return;
+      }
+
+      accounts.forEach((account) => {
+        const option = document.createElement('option');
+        option.value = String(account.id);
+        option.textContent = `${account.provider_account_email} (${String(account.status).replace(/_/g, ' ')})`;
+        select.appendChild(option);
+      });
+
+      const match = accounts.find((account) => String(account.id) === previousValue);
+      select.value = match ? String(match.id) : String(accounts[0].id);
+      select.disabled = false;
+      hint.textContent = 'Choose the authenticated account that should access this external calendar.';
+    }
+
+    function updateEndpointControls(endpointKey) {
+      const providerSelect = document.getElementById(`endpoint${endpointKey.toUpperCase()}Provider`);
+      const emailInput = document.getElementById(`endpoint${endpointKey.toUpperCase()}CalendarEmail`);
+      const emailHint = document.getElementById(`endpoint${endpointKey.toUpperCase()}EmailHint`);
+      const accountWrapper = document.getElementById(`endpoint${endpointKey.toUpperCase()}AccountWrapper`);
+      const provider = providerSelect.value;
+
+      if (provider === 'mailcow') {
+        accountWrapper.classList.add('hidden');
+        emailInput.readOnly = true;
+        emailInput.value = state.session && state.session.mailbox ? state.session.mailbox : '';
+        emailHint.textContent = 'Mailcow endpoints are locked to the signed-in mailbox for safety.';
+        return;
+      }
+
+      accountWrapper.classList.remove('hidden');
+      emailInput.readOnly = false;
+      if (!emailInput.value || emailInput.value === (state.session ? state.session.mailbox : '')) {
+        emailInput.value = '';
+      }
+      emailInput.placeholder = 'shared-calendar@example.com';
+      emailHint.textContent = 'Enter the calendar email address you want to sync. It can differ from the authenticated account.';
+      fillEndpointAccountSelect(endpointKey, provider);
+    }
+
+    function resetAccountForm() {
+      document.getElementById('accountForm').reset();
+      populateAccountProviderSelect();
+    }
+
+    function resetJobForm() {
+      document.getElementById('jobForm').reset();
+      document.getElementById('intervalSeconds').value = '300';
+      document.getElementById('syncMode').value = 'two_way';
+      document.getElementById('conflictPolicy').value = 'newest_wins';
+      populateEndpointProviderSelect('endpointAProvider', true, 'mailcow');
+      populateEndpointProviderSelect('endpointBProvider', true, defaultExternalProvider());
+      updateEndpointControls('a');
+      updateEndpointControls('b');
+    }
+
+    function providerTemplate(provider) {
+      const defaults = {
+        provider,
+        provider_label: providerLabel(provider),
+        source: 'missing',
+        configured: false,
+        enabled: false,
+        secret_configured: false,
+        status_label: 'Not configured',
+        available_for_users: false,
+        managed_by_environment: false,
+        can_remove: false,
+        client_id: '',
+        redirect_uri: `${window.location.origin}/api/oauth/${provider}/callback.php`,
+        scopes: provider === 'google'
+          ? 'openid email https://www.googleapis.com/auth/calendar'
+          : 'offline_access openid profile email User.Read Calendars.ReadWrite',
+        tenant_id: provider === 'microsoft' ? 'common' : null,
+      };
+
+      const existing = getProviderSetting(provider);
+      return Object.assign({}, defaults, existing || {});
+    }
+
+    function recommendedRedirectUri(provider) {
+      return `${window.location.origin}/api/oauth/${provider}/callback.php`;
+    }
+
+    function providerSetupGuideHtml(provider, setting) {
+      const redirectUri = escapeHtml(setting.redirect_uri || recommendedRedirectUri(provider));
+      const currentOrigin = escapeHtml(window.location.origin);
+      const scopes = escapeHtml(setting.scopes || '');
+
+      if (provider === 'google') {
+        return `
+          <h4>Google test checklist</h4>
+          <p>Use these exact values when you create the Google OAuth web client for this Mailcow host.</p>
+          <ul>
+            <li>Enable the <strong>Google Calendar API</strong> in the Google Cloud project.</li>
+            <li>Use <strong>Google Auth Platform</strong> audience <strong>External</strong> with publishing status <strong>Testing</strong>.</li>
+            <li>Add every Google account you will use during testing as a <strong>Test user</strong>.</li>
+            <li>Use this exact authorized redirect URI: <span class="mono">${redirectUri}</span></li>
+            <li>Keep the requested scopes aligned with Mailcow: <span class="mono">${scopes}</span></li>
+            <li>Authorized JavaScript origins are not required for this server-side flow. If Google asks for one, use <span class="mono">${currentOrigin}</span>.</li>
+            <li>Google test-user grants expire after 7 days, so re-consent during longer tests is expected.</li>
+          </ul>
+        `;
+      }
+
+      return `
+        <h4>Microsoft test checklist</h4>
+        <p>Use the values below when creating the Outlook / Microsoft 365 app registration for this Mailcow host.</p>
+        <ul>
+          <li>Use this exact redirect URI: <span class="mono">${redirectUri}</span></li>
+          <li>Keep the requested scopes aligned with Mailcow: <span class="mono">${scopes}</span></li>
+          <li>Leave tenant as <span class="mono">${escapeHtml(setting.tenant_id || 'common')}</span> unless you intentionally want one Microsoft tenant only.</li>
+          <li>After saving provider setup here, mailbox users can connect Outlook accounts from the External accounts tab.</li>
+        </ul>
+      `;
+    }
+
+    function fillProviderForm(provider) {
+      const setting = providerTemplate(provider);
+      document.getElementById('providerName').value = setting.provider;
+      document.getElementById('providerClientId').value = setting.client_id || '';
+      document.getElementById('providerClientSecret').value = '';
+      document.getElementById('providerRedirectUri').value = setting.redirect_uri || '';
+      document.getElementById('providerScopes').value = setting.scopes || '';
+      document.getElementById('providerTenantId').value = setting.tenant_id || 'common';
+      document.getElementById('providerEnabled').checked = !!setting.enabled || !setting.configured;
+
+      const intro = document.getElementById('providerFormIntro');
+      const title = document.getElementById('providerFormTitle');
+      const secretHelp = document.getElementById('providerSecretHelp');
+      const note = document.getElementById('providerFormNote');
+      const guide = document.getElementById('providerSetupGuide');
+      const tenantField = document.getElementById('providerTenantField');
+
+      title.textContent = `${setting.configured ? 'Update' : 'Configure'} ${setting.provider_label}`;
+      intro.textContent = setting.configured
+        ? 'Update the shared provider credentials used by mailbox users. Saved secrets remain hidden.'
+        : 'Save the shared provider credentials used by mailbox users on this Mailcow instance.';
+
+      secretHelp.textContent = setting.configured
+        ? 'Leave blank to keep the stored secret. Enter a new value only when rotating credentials.'
+        : 'This secret will be encrypted on save and hidden immediately after it is stored.';
+
+      if (setting.managed_by_environment) {
+        note.textContent = 'This provider is currently available from Mailcow environment values. Saving here will create a Calendar Sync UI-managed override.';
+      } else if (setting.configured) {
+        note.textContent = 'Stored secrets are never shown again after save. Use this form to rotate the secret, disable mailbox access, or adjust redirect/scopes.';
+      } else {
+        note.textContent = 'Mailbox users will only be able to connect this provider after client ID, client secret, enable state, and MC_CALSYNC_CRYPTO_KEY have been configured for Mailcow.';
+      }
+
+      guide.innerHTML = providerSetupGuideHtml(provider, setting);
+      tenantField.classList.toggle('hidden', provider !== 'microsoft');
+    }
+
+    function parseOauthNotice() {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get('oauth_status');
+      if (!status) {
+        return;
+      }
+
+      const provider = params.get('provider');
+      const message = params.get('message');
+      if (status === 'connected') {
+        showNotice(`${providerLabel(provider || 'provider')} connected successfully.`, 'success');
+        if (state.session && state.session.can_manage_syncs) {
+          setActiveTab('accounts');
+        }
+      } else {
+        showNotice(message || `${providerLabel(provider || 'provider')} connection failed.`, 'danger');
+        if (state.session && state.session.can_manage_syncs) {
+          setActiveTab('accounts');
+        }
+      }
+
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    function renderAll() {
+      renderSessionBanner();
+      renderTabs();
+      renderProviderSettings();
+      renderAccounts();
+      renderJobs();
+    }
+
+    async function loadDashboard() {
+      try {
+        const data = await apiRequest('dashboard', { fallbackError: 'Could not load calendar sync dashboard' });
+        state.csrfToken = data.csrf_token || '';
+        state.session = data.session || { authenticated: false };
+        state.providerSettings = Array.isArray(data.provider_settings) ? data.provider_settings : [];
+        state.accounts = Array.isArray(data.accounts) ? data.accounts : [];
+        state.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+
+        if (state.session && state.session.is_admin && !state.session.can_manage_syncs) {
+          state.activeTab = 'providers';
+        }
+
+        renderAll();
+        setActiveTab(state.activeTab);
+        parseOauthNotice();
+      } catch (error) {
+        state.csrfToken = '';
+        state.session = { authenticated: false, is_admin: false, can_manage_syncs: false };
+        state.providerSettings = [];
+        state.accounts = [];
+        state.jobs = [];
+        renderAll();
+        setActiveTab('jobs');
+        showNotice(error.message || 'Could not load calendar sync dashboard.', 'danger');
+      }
+    }
+
+    async function saveProviderSetup(event) {
+      event.preventDefault();
+
+      const provider = document.getElementById('providerName').value;
+      const clientId = document.getElementById('providerClientId').value.trim();
+      const clientSecret = document.getElementById('providerClientSecret').value.trim();
+      const redirectUri = document.getElementById('providerRedirectUri').value.trim();
+      const scopes = document.getElementById('providerScopes').value.trim();
+      const tenantId = document.getElementById('providerTenantId').value.trim();
+      const enabled = document.getElementById('providerEnabled').checked;
+      const existing = getProviderSetting(provider);
+
+      if (!clientId) {
+        showNotice('Client ID is required.', 'danger');
+        return;
+      }
+
+      if ((!existing || !existing.secret_configured) && !clientSecret) {
+        showNotice('Client secret is required the first time this provider is configured.', 'danger');
+        return;
+      }
+
+      const payload = {
+        provider,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scopes,
+        enabled,
+      };
+
+      if (clientSecret) {
+        payload.client_secret = clientSecret;
+      }
+
+      if (provider === 'microsoft') {
+        payload.tenant_id = tenantId || 'common';
+      }
+
+      try {
+        const result = await apiRequest('provider-settings', {
+          method: 'POST',
+          body: payload,
+          fallbackError: 'Could not save provider setup',
+        });
+
+        upsertStateItem('providerSettings', result.item);
+        document.getElementById('providerFormCard').classList.add('hidden');
+        renderAll();
+        setActiveTab('providers');
+        showNotice(result.message || `${providerLabel(provider)} setup saved.`, 'success');
+      } catch (error) {
+        if (String(error.message || '').includes('Secure token storage is not configured')) {
+          showNotice('Secure token storage is not configured. Add MC_CALSYNC_CRYPTO_KEY to php-fpm-mailcow, restart Mailcow, then retry saving provider setup.', 'danger');
+          return;
+        }
+
+        showNotice(error.message || 'Could not save provider setup.', 'danger');
+      }
+    }
+
+    async function saveExternalAccount(event) {
+      event.preventDefault();
+
+      const payload = {
+        provider: document.getElementById('accountProvider').value,
+        provider_account_email: document.getElementById('providerAccountEmail').value.trim(),
+        display_name: document.getElementById('providerDisplayName').value.trim(),
+      };
+
+      try {
+        const result = await apiRequest('accounts', {
+          method: 'POST',
+          body: payload,
+          fallbackError: 'Could not save external account',
+        });
+
+        if (result.account) {
+          upsertStateItem('accounts', result.account);
+        }
+
+        document.getElementById('accountFormCard').classList.add('hidden');
+        resetAccountForm();
+        renderAll();
+        setActiveTab('accounts');
+        showNotice(result.message || 'External account saved.', 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not save external account.', 'danger');
+      }
+    }
+
+    async function saveSyncLink(event) {
+      event.preventDefault();
+
+      const endpointAProvider = document.getElementById('endpointAProvider').value;
+      const endpointBProvider = document.getElementById('endpointBProvider').value;
+
+      const payload = {
+        sync_label: document.getElementById('syncLabel').value.trim(),
+        sync_mode: document.getElementById('syncMode').value,
+        conflict_policy: document.getElementById('conflictPolicy').value,
+        interval_seconds: Number(document.getElementById('intervalSeconds').value),
+        endpoint_a: {
+          provider: endpointAProvider,
+          calendar_email: document.getElementById('endpointACalendarEmail').value.trim(),
+        },
+        endpoint_b: {
+          provider: endpointBProvider,
+          calendar_email: document.getElementById('endpointBCalendarEmail').value.trim(),
+        },
+      };
+
+      if (endpointAProvider !== 'mailcow') {
+        payload.endpoint_a.account_id = Number(document.getElementById('endpointAAccountId').value);
+      }
+
+      if (endpointBProvider !== 'mailcow') {
+        payload.endpoint_b.account_id = Number(document.getElementById('endpointBAccountId').value);
+      }
+
+      try {
+        const result = await apiRequest('jobs', {
+          method: 'POST',
+          body: payload,
+          fallbackError: 'Could not create sync link',
+        });
+
+        if (result.job) {
+          upsertStateItem('jobs', result.job);
+        }
+
+        document.getElementById('jobFormCard').classList.add('hidden');
+        resetJobForm();
+        renderAll();
+        setActiveTab('jobs');
+        showNotice(result.message || 'Sync link created.', 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not create sync link.', 'danger');
+      }
+    }
+
+    async function toggleProvider(provider, enabled) {
+      try {
+        const result = await apiRequest('provider-settings', {
+          method: 'PATCH',
+          query: { provider },
+          body: { provider, enabled },
+          fallbackError: 'Could not update provider status',
+        });
+
+        upsertStateItem('providerSettings', result.item);
+        renderAll();
+        showNotice(result.message || `${providerLabel(provider)} updated.`, 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not update provider status.', 'danger');
+      }
+    }
+
+    async function removeProvider(provider) {
+      const confirmed = window.confirm(`Remove ${providerLabel(provider)} setup? Mailbox users will no longer be able to start new OAuth connections for this provider.`);
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        const result = await apiRequest('provider-settings', {
+          method: 'DELETE',
+          query: { provider },
+          fallbackError: 'Could not remove provider setup',
+        });
+
+        removeProviderState(provider);
+        document.getElementById('providerFormCard').classList.add('hidden');
+        renderAll();
+        showNotice(result.message || `${providerLabel(provider)} setup removed.`, 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not remove provider setup.', 'danger');
+      }
+    }
+
+    async function toggleJob(jobId, enabled) {
+      try {
+        const result = await apiRequest('jobs', {
+          method: 'PATCH',
+          query: { id: jobId },
+          body: { enabled },
+          fallbackError: 'Could not update sync status',
+        });
+
+        if (result.job) {
+          upsertStateItem('jobs', result.job);
+        }
+
+        renderJobs();
+        showNotice(enabled ? 'Sync link enabled.' : 'Sync link paused.', 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not update sync status.', 'danger');
+      }
+    }
+
+    async function deleteJob(jobId) {
+      const confirmed = window.confirm('Delete this sync link?');
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await apiRequest('jobs', {
+          method: 'DELETE',
+          query: { id: jobId },
+          fallbackError: 'Could not delete sync link',
+        });
+
+        state.jobs = state.jobs.filter((job) => String(job.id) !== String(jobId));
+        renderJobs();
+        showNotice('Sync link deleted.', 'success');
+      } catch (error) {
+        showNotice(error.message || 'Could not delete sync link.', 'danger');
+      }
+    }
+
+    function bindEvents() {
+      document.getElementById('providerForm').addEventListener('submit', saveProviderSetup);
+      document.getElementById('accountForm').addEventListener('submit', saveExternalAccount);
+      document.getElementById('jobForm').addEventListener('submit', saveSyncLink);
+
+      document.getElementById('closeProviderFormButton').addEventListener('click', () => {
+        document.getElementById('providerFormCard').classList.add('hidden');
+      });
+
+      document.getElementById('closeAccountFormButton').addEventListener('click', () => {
+        document.getElementById('accountFormCard').classList.add('hidden');
+      });
+
+      document.getElementById('closeJobFormButton').addEventListener('click', () => {
+        document.getElementById('jobFormCard').classList.add('hidden');
+      });
+
+      document.getElementById('openAccountFormButton').addEventListener('click', () => {
+        clearNotice();
+        resetAccountForm();
+        document.getElementById('accountFormCard').classList.remove('hidden');
+      });
+
+      document.getElementById('openJobFormButton').addEventListener('click', () => {
+        clearNotice();
+        resetJobForm();
+        document.getElementById('jobFormCard').classList.remove('hidden');
+      });
+
+      document.getElementById('providerName').addEventListener('change', (event) => {
+        fillProviderForm(event.target.value);
+      });
+
+      document.getElementById('endpointAProvider').addEventListener('change', () => {
+        updateEndpointControls('a');
+      });
+
+      document.getElementById('endpointBProvider').addEventListener('change', () => {
+        updateEndpointControls('b');
+      });
+
+      document.getElementById('tabNav').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-tab]');
+        if (!button || button.disabled) {
+          return;
+        }
+        setActiveTab(button.dataset.tab);
+      });
+
+      document.querySelectorAll('[data-provider-open]').forEach((button) => {
+        button.addEventListener('click', () => {
+          clearNotice();
+          fillProviderForm(button.dataset.providerOpen);
+          document.getElementById('providerFormCard').classList.remove('hidden');
+          setActiveTab('providers');
+        });
+      });
+
+      document.getElementById('providersBody').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-provider-action]');
+        if (!button) {
+          return;
+        }
+
+        const provider = button.dataset.provider;
+        const action = button.dataset.providerAction;
+
+        if (action === 'edit') {
+          clearNotice();
+          fillProviderForm(provider);
+          document.getElementById('providerFormCard').classList.remove('hidden');
+          setActiveTab('providers');
+          return;
+        }
+
+        if (action === 'toggle') {
+          toggleProvider(provider, button.dataset.enabled === '1');
+          return;
+        }
+
+        if (action === 'remove') {
+          removeProvider(provider);
+        }
+      });
+
+      document.getElementById('jobsBody').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-job-action]');
+        if (!button) {
+          return;
+        }
+
+        const jobId = button.dataset.jobId;
+        const action = button.dataset.jobAction;
+        if (action === 'toggle') {
+          toggleJob(jobId, button.dataset.enabled === '1');
+          return;
+        }
+
+        if (action === 'delete') {
+          deleteJob(jobId);
+        }
+      });
+    }
+
+    function initialize() {
+      bindEvents();
+      populateEndpointProviderSelect('endpointAProvider', true, 'mailcow');
+      populateEndpointProviderSelect('endpointBProvider', true, 'google');
+      populateAccountProviderSelect();
+      fillProviderForm('google');
+      resetJobForm();
+      loadDashboard();
+    }
+
+    initialize();
+  </script>
 </body>
 </html>
