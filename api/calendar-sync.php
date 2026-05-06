@@ -98,20 +98,31 @@ try {
     $accountStmt->execute(['id' => (int)$input['external_account_id'], 'owner' => $owner]);
     if (!$accountStmt->fetch()) jsonResponse(403, ['error' => 'Invalid account ownership']);
 
-    $stmt = $pdo->prepare('INSERT INTO calendar_sync_jobs (owner_mailbox, mailcow_calendar_id, external_account_id, external_calendar_id, direction, conflict_policy, interval_seconds, enabled, status, next_run_at) VALUES (:owner, :mailcow_calendar_id, :external_account_id, :external_calendar_id, :direction, :conflict_policy, :interval_seconds, 1, :status, DATE_ADD(NOW(), INTERVAL 1 MINUTE))');
-    $stmt->execute([
-      'owner' => $owner,
-      'mailcow_calendar_id' => mb_substr((string)$input['mailcow_calendar_id'], 0, 255),
-      'external_account_id' => (int)$input['external_account_id'],
-      'external_calendar_id' => mb_substr((string)$input['external_calendar_id'], 0, 255),
-      'direction' => (string)$input['direction'],
-      'conflict_policy' => (string)$input['conflict_policy'],
-      'interval_seconds' => max(60, min(3600, (int)($input['interval_seconds'] ?? 300))),
-      'status' => 'idle',
-    ]);
+    try {
+      $pdo->beginTransaction();
 
-    $jobId = (int)$pdo->lastInsertId();
-    audit($pdo, $owner, 'job_create', 'job', $jobId, 'success');
+      $stmt = $pdo->prepare('INSERT INTO calendar_sync_jobs (owner_mailbox, mailcow_calendar_id, external_account_id, external_calendar_id, direction, conflict_policy, interval_seconds, enabled, status, next_run_at) VALUES (:owner, :mailcow_calendar_id, :external_account_id, :external_calendar_id, :direction, :conflict_policy, :interval_seconds, 1, :status, DATE_ADD(NOW(), INTERVAL 1 MINUTE))');
+      $stmt->execute([
+        'owner' => $owner,
+        'mailcow_calendar_id' => mb_substr((string)$input['mailcow_calendar_id'], 0, 255),
+        'external_account_id' => (int)$input['external_account_id'],
+        'external_calendar_id' => mb_substr((string)$input['external_calendar_id'], 0, 255),
+        'direction' => (string)$input['direction'],
+        'conflict_policy' => (string)$input['conflict_policy'],
+        'interval_seconds' => max(60, min(3600, (int)($input['interval_seconds'] ?? 300))),
+        'status' => 'idle',
+      ]);
+
+      $jobId = (int)$pdo->lastInsertId();
+      audit($pdo, $owner, 'job_create', 'job', $jobId, 'success');
+      $pdo->commit();
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $e;
+    }
+
     jsonResponse(201, ['ok' => true, 'id' => $jobId]);
   }
 
